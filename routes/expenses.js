@@ -1,3 +1,4 @@
+// routes/expenses.js
 const express = require('express');
 const router = express.Router();
 const Expense = require('../models/Expense');
@@ -65,6 +66,47 @@ router.get('/:userId', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve expenses', error: error.message });
+  }
+});
+
+// Handle QR Code Scan
+router.post('/scan', async (req, res) => {
+  try {
+    const { userId, data } = req.body;
+
+    // Validate presence of userId and data
+    if (!userId || !data) {
+      return res.status(400).json({ message: 'userId and data are required' });
+    }
+
+    // Parse the QR data
+    let parsedData;
+    try {
+      parsedData = JSON.parse(data);
+    } catch (parseError) {
+      return res.status(400).json({ message: 'Invalid QR data format. Expected JSON string.' });
+    }
+
+    const { destinatary, amount } = parsedData;
+
+    // Validate the parsed data
+    if (!destinatary || !amount || typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({ message: 'Invalid expense data in QR code.' });
+    }
+
+    // Create and save the new expense
+    const newExpense = new Expense({
+      userId,
+      category: destinatary,
+      amount,
+      date: new Date(),
+    });
+
+    await newExpense.save();
+
+    res.status(201).json({ message: 'Expense added via QR scan successfully', expense: newExpense });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to add expense via QR scan', error: error.message });
   }
 });
 

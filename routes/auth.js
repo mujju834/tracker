@@ -45,6 +45,7 @@ router.post('/register', async (req, res) => {
 // Login Route
 // routes/auth.js
 router.post('/login', async (req, res) => {
+  console.log('called login endpoint');
     const { email, password } = req.body;
   
     try {
