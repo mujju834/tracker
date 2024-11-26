@@ -13,16 +13,16 @@ connectDB(); // Connect to MongoDB
 const app = express();
 app.use(express.json()); // Middleware to parse JSON requests
 
-// Enable CORS
-app.use(cors()); // Allow requests from any origin (for development)
+// Enable CORS for all origins
+app.use(cors());
 
 // Routes
 app.use('/api/auth', authRoutes); // Authentication routes
 app.use('/api/expenses', expenseRoutes); // Expense routes
 
 app.get('/', (req, res) => {
-    res.status(200).json({ message: 'spending-tracker backend API is working correctly!' });
-  });
+    res.status(200).json({ message: 'spending-tracker backend API is working correctly and you can see it here!' });
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
