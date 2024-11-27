@@ -4,6 +4,23 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const Expense = require('../models/Expense');
 
+// Helper function to recursively extract name, price, and quantity pairs
+const extractExpenseItems = (obj, results = []) => {
+  if (Array.isArray(obj)) {
+    obj.forEach(item => extractExpenseItems(item, results));
+  } else if (obj !== null && typeof obj === 'object') {
+    if (obj.hasOwnProperty('name') && obj.hasOwnProperty('price')) {
+      results.push({
+        name: obj.name,
+        price: obj.price,
+        quantity: obj.quantity !== undefined ? obj.quantity : 1, // Default quantity to 1 if not provided
+      });
+    }
+    Object.values(obj).forEach(value => extractExpenseItems(value, results));
+  }
+  return results;
+};
+
 // Add a new expense
 router.post('/add', async (req, res) => {
   try {
@@ -42,7 +59,7 @@ router.post('/add', async (req, res) => {
 router.get('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { startDate, endDate, page = 1, limit = 10 } = req.query;
+    const { startDate, endDate, page = 1, limit = 1000 } = req.query; // Increased default limit
 
     // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -115,27 +132,42 @@ router.post('/scan', async (req, res) => {
       return res.status(400).json({ message: 'Invalid QR data format. Expected JSON string.' });
     }
 
-    const { destinatary, amount } = parsedData;
+    // Extract expense items with name, price, and quantity
+    const extractedItems = extractExpenseItems(parsedData);
 
-    // Validate the parsed data
-    if (!destinatary || amount === undefined) {
-      return res.status(400).json({ message: 'destinatary and amount are required in QR data.' });
+    if (extractedItems.length === 0) {
+      return res.status(400).json({ message: 'No valid expense items found in QR data.' });
     }
 
-    if (typeof amount !== 'number' || amount <= 0) {
-      return res.status(400).json({ message: 'Amount must be a positive number.' });
-    }
+    // Validate and create expense entries
+    const expensePromises = extractedItems.map(item => {
+      const { name, price, quantity } = item;
 
-    const newExpense = new Expense({
-      userId,
-      category: destinatary,
-      amount,
-      date: new Date(),
+      if (!name || price === undefined) {
+        throw new Error('Each item must have a name and price.');
+      }
+
+      if (typeof price !== 'number' || price <= 0) {
+        throw new Error('Price must be a positive number.');
+      }
+
+      if (typeof quantity !== 'number' || quantity <= 0) {
+        throw new Error('Quantity must be a positive number.');
+      }
+
+      const amount = price * quantity;
+
+      return new Expense({
+        userId,
+        category: name,
+        amount,
+        date: parsedData.date ? new Date(parsedData.date) : new Date(),
+      }).save();
     });
 
-    await newExpense.save();
+    const savedExpenses = await Promise.all(expensePromises);
 
-    res.status(201).json({ message: 'Expense added via QR scan successfully', expense: newExpense });
+    res.status(201).json({ message: 'Expenses added successfully via QR scan', expenses: savedExpenses });
   } catch (error) {
     res.status(500).json({ message: 'Failed to add expense via QR scan', error: error.message });
   }
@@ -163,6 +195,27 @@ router.delete('/:expenseId', async (req, res) => {
     res.status(200).json({ message: 'Expense deleted successfully.' });
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete expense.', error: error.message });
+  }
+});
+
+
+// Delete all expenses for a specific user
+router.delete('/all/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid userId.' });
+    }
+
+    // Delete all expenses associated with the user
+    const result = await Expense.deleteMany({ userId });
+
+    res.status(200).json({ message: 'All expenses deleted successfully.', deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error('Failed to delete all expenses:', error);
+    res.status(500).json({ message: 'Failed to delete all expenses.', error: error.message });
   }
 });
 
