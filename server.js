@@ -1,24 +1,29 @@
-// server.js
 const express = require('express');
 const connectDB = require('./config/db');
 const dotenv = require('dotenv');
-const cors = require('cors'); // Import CORS middleware
+const cors = require('cors');
 const authRoutes = require('./routes/auth');
-const expenseRoutes = require('./routes/expenses'); // Import expense routes
+const expenseRoutes = require('./routes/expenses');
 
-dotenv.config(); // Load environment variables
+dotenv.config();
 
-connectDB(); // Connect to MongoDB
+connectDB();
 
 const app = express();
-app.use(express.json()); // Middleware to parse JSON requests
+app.use(express.json());
 
-// Enable CORS for all origins
-app.use(cors());
+// Explicit CORS configuration
+const corsOptions = {
+    origin: '*', // Allow all origins
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
 
 // Routes
-app.use('/api/auth', authRoutes); // Authentication routes
-app.use('/api/expenses', expenseRoutes); // Expense routes
+app.use('/api/auth', authRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 app.get('/', (req, res) => {
     res.status(200).json({ message: 'spending-tracker backend API is working correctly and you can see it here!' });
